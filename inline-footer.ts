@@ -59,6 +59,7 @@ function modeBadge(status: string | undefined, theme: ExtensionContext["ui"]["th
 		return theme.fg("accent", `📋 ${progress}`);
 	}
 	if (lower.includes("plan")) return theme.fg("warning", "📝 PLAN");
+	if (lower.includes("discuss")) return theme.fg("accent", "💬 DISCUSS");
 	return theme.fg("accent", "🛠  BUILD");
 }
 

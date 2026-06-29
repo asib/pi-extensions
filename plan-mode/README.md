@@ -1,12 +1,14 @@
 # Plan Mode Extension
 
-Read-only exploration mode for safe code analysis.
+Read-only exploration modes for safe code analysis and context building.
 
 ## Features
 
-- **Built-in write tools disabled**: Disables edit/write while preserving other active tools
-- **Bash allowlist**: Only read-only bash commands are allowed
-- **Plan extraction**: Extracts numbered steps from `Plan:` sections
+- **Plan mode**: read-only planning with numbered plan extraction and execution tracking
+- **Discuss mode**: read-only context-building without pressure to produce a formal plan
+- **Built-in write tools disabled**: Disables edit/write while preserving other active tools in plan/discuss modes
+- **Bash allowlist**: Only read-only bash commands are allowed in plan/discuss modes
+- **Plan extraction**: Extracts numbered steps from `Plan:` sections while in plan mode
 - **Progress tracking**: Widget shows completion status during execution
 - **[DONE:n] markers**: Explicit step completion tracking
 - **Session persistence**: State survives session resume
@@ -14,13 +16,21 @@ Read-only exploration mode for safe code analysis.
 ## Commands
 
 - `/plan` - Toggle between plan and build modes
+- `/discuss` - Toggle between discuss and build modes
 - `/todos` - Show current plan progress
-- `Tab` - Toggle between plan and build modes (shortcut; overrides path completion while this extension is loaded)
-- `Ctrl+Alt+P` - Toggle between plan and build modes (shortcut)
+- `Tab` - Cycle build → plan → discuss → build (shortcut; overrides path completion while this extension is loaded)
+- `Ctrl+Alt+P` - Cycle build → plan → discuss → build (shortcut)
+
+## Flags
+
+- `--plan` - Start in plan mode
+- `--discuss` - Start in discuss mode
 
 ## Usage
 
-1. Enable plan mode with `/plan`, `Tab`, or `--plan` flag
+### Plan mode
+
+1. Enable plan mode with `/plan`, `Tab`, `Ctrl+Alt+P`, or `--plan` (`Tab`/`Ctrl+Alt+P` cycle through build, plan, and discuss)
 2. Ask the agent to analyze code and create a plan
 3. The agent should output a numbered plan under a `Plan:` header:
 
@@ -35,15 +45,34 @@ Plan:
 5. During execution, the agent marks steps complete with `[DONE:n]` tags
 6. Progress widget shows completion status
 
+### Discuss mode
+
+1. Enable discuss mode with `/discuss`, by cycling with `Tab`/`Ctrl+Alt+P`, or with `--discuss`
+2. Ask questions, explore code, or establish shared context for later in the chat
+3. The agent can read/search/inspect and ask clarifying questions, but should not make changes
+4. The agent should capture relevant context, constraints, decisions, risks, and open questions instead of producing a formal implementation plan unless explicitly asked
+5. Return to build mode with `/discuss` when ready to act on the established context
+
 ## How It Works
 
 ### Plan Mode (Read-Only)
+
 - Built-in edit/write tools disabled
 - Other active tools remain available
 - Bash commands filtered through allowlist
-- Agent creates a plan without making changes
+- Agent creates a numbered plan without making changes
+- Plan steps can be promoted into execution mode with progress tracking
+
+### Discuss Mode (Read-Only)
+
+- Built-in edit/write tools disabled
+- Other active tools remain available
+- Bash commands filtered through allowlist
+- Agent focuses on shared context, explanations, clarifying questions, and notes for later turns
+- Plan extraction and execution prompts are disabled unless you switch to plan mode
 
 ### Execution Mode
+
 - Full tool access restored
 - Agent executes steps in order
 - `[DONE:n]` markers track completion

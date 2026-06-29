@@ -1,13 +1,15 @@
 /**
  * Plan Mode Extension
  *
- * Read-only exploration mode for safe code analysis.
+ * Read-only exploration modes for safe code analysis and context building.
  * When enabled, built-in write tools are disabled.
  *
  * Features:
- * - /plan command, Tab, or Ctrl+Alt+P to toggle between plan and build modes
+ * - /plan command to toggle between plan and build modes
+ * - /discuss command to toggle between discuss and build modes
+ * - Tab or Ctrl+Alt+P to cycle build → plan → discuss
  * - Bash restricted to allowlisted read-only commands
- * - Extracts numbered plan steps from "Plan:" sections
+ * - Extracts numbered plan steps from "Plan:" sections in plan mode
  * - [DONE:n] markers to complete steps during execution
  * - Progress tracking widget during execution
  */
@@ -19,13 +21,16 @@ import { Key } from "@earendil-works/pi-tui";
 import { extractTodoItems, isSafeCommand, markCompletedSteps, type TodoItem } from "./utils.ts";
 
 // Tools
-const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "questionnaire"];
+const READ_ONLY_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "questionnaire"];
 const NORMAL_MODE_TOOLS = ["read", "bash", "edit", "write"];
-const PLAN_MODE_DISABLED_TOOLS = new Set<string>(["edit", "write"]);
-const PLAN_MANAGED_TOOLS = new Set<string>([...PLAN_MODE_TOOLS, ...NORMAL_MODE_TOOLS]);
+const READ_ONLY_MODE_DISABLED_TOOLS = new Set<string>(["edit", "write"]);
+const MANAGED_TOOLS = new Set<string>([...READ_ONLY_MODE_TOOLS, ...NORMAL_MODE_TOOLS]);
+
+type AssistantMode = "build" | "plan" | "discuss";
 
 interface PlanModeState {
-	enabled: boolean;
+	enabled?: boolean;
+	mode?: AssistantMode;
 	todos?: TodoItem[];
 	executing?: boolean;
 	toolsBeforePlanMode?: string[];
@@ -44,8 +49,13 @@ function getTextContent(message: AssistantMessage): string {
 		.join("\n");
 }
 
+function normalizeMode(value: unknown): AssistantMode | undefined {
+	if (value === "build" || value === "plan" || value === "discuss") return value;
+	return undefined;
+}
+
 export default function planModeExtension(pi: ExtensionAPI): void {
-	let planModeEnabled = false;
+	let mode: AssistantMode = "build";
 	let executionMode = false;
 	let todoItems: TodoItem[] = [];
 	let toolsBeforePlanMode: string[] | undefined;
@@ -56,13 +66,25 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 		default: false,
 	});
 
+	pi.registerFlag("discuss", {
+		description: "Start in discuss mode (read-only context building)",
+		type: "boolean",
+		default: false,
+	});
+
+	function isReadOnlyMode(): boolean {
+		return mode === "plan" || mode === "discuss";
+	}
+
 	function updateStatus(ctx: ExtensionContext): void {
 		// Footer status
 		if (executionMode && todoItems.length > 0) {
 			const completed = todoItems.filter((t) => t.completed).length;
 			ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("accent", `📋 ${completed}/${todoItems.length}`));
-		} else if (planModeEnabled) {
+		} else if (mode === "plan") {
 			ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("warning", "⏸ plan"));
+		} else if (mode === "discuss") {
+			ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("accent", "💬 discuss"));
 		} else {
 			ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("success", "build"));
 		}
@@ -87,25 +109,25 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 		return [...new Set(toolNames)];
 	}
 
-	function getPlanModeTools(activeToolNames: string[]): string[] {
+	function getReadOnlyModeTools(activeToolNames: string[]): string[] {
 		return uniqueToolNames([
-			...activeToolNames.filter((name) => !PLAN_MODE_DISABLED_TOOLS.has(name)),
-			...PLAN_MODE_TOOLS,
+			...activeToolNames.filter((name) => !READ_ONLY_MODE_DISABLED_TOOLS.has(name)),
+			...READ_ONLY_MODE_TOOLS,
 		]);
 	}
 
 	function getNormalModeTools(activeToolNames: string[]): string[] {
 		return uniqueToolNames([
 			...NORMAL_MODE_TOOLS,
-			...activeToolNames.filter((name) => !PLAN_MANAGED_TOOLS.has(name)),
+			...activeToolNames.filter((name) => !MANAGED_TOOLS.has(name)),
 		]);
 	}
 
-	function enablePlanModeTools(): void {
+	function enableReadOnlyModeTools(): void {
 		if (toolsBeforePlanMode === undefined) {
 			toolsBeforePlanMode = pi.getActiveTools();
 		}
-		pi.setActiveTools(getPlanModeTools(toolsBeforePlanMode));
+		pi.setActiveTools(getReadOnlyModeTools(toolsBeforePlanMode));
 	}
 
 	function restoreNormalModeTools(): void {
@@ -115,32 +137,57 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 
 	function persistState(): void {
 		pi.appendEntry("plan-mode", {
-			enabled: planModeEnabled,
+			enabled: mode === "plan",
+			mode,
 			todos: todoItems,
 			executing: executionMode,
 			toolsBeforePlanMode,
 		});
 	}
 
-	function togglePlanMode(ctx: ExtensionContext): void {
-		planModeEnabled = !planModeEnabled;
+	function setAssistantMode(nextMode: AssistantMode, ctx: ExtensionContext): void {
+		mode = nextMode;
 		executionMode = false;
 		todoItems = [];
 
-		if (planModeEnabled) {
-			enablePlanModeTools();
-			ctx.ui.notify("Plan mode enabled. Built-in write tools disabled.");
+		if (isReadOnlyMode()) {
+			enableReadOnlyModeTools();
 		} else {
 			restoreNormalModeTools();
+		}
+
+		if (mode === "plan") {
+			ctx.ui.notify("Plan mode enabled. Built-in write tools disabled.");
+		} else if (mode === "discuss") {
+			ctx.ui.notify("Discuss mode enabled. Built-in write tools disabled; focus on building shared context.");
+		} else {
 			ctx.ui.notify("Build mode enabled. Full access restored.");
 		}
 		updateStatus(ctx);
 		persistState();
 	}
 
+	function togglePlanMode(ctx: ExtensionContext): void {
+		setAssistantMode(mode === "plan" ? "build" : "plan", ctx);
+	}
+
+	function toggleDiscussMode(ctx: ExtensionContext): void {
+		setAssistantMode(mode === "discuss" ? "build" : "discuss", ctx);
+	}
+
+	function cycleAssistantMode(ctx: ExtensionContext): void {
+		const nextMode: AssistantMode = mode === "build" ? "plan" : mode === "plan" ? "discuss" : "build";
+		setAssistantMode(nextMode, ctx);
+	}
+
 	pi.registerCommand("plan", {
 		description: "Toggle between plan and build modes",
 		handler: async (_args, ctx) => togglePlanMode(ctx),
+	});
+
+	pi.registerCommand("discuss", {
+		description: "Toggle between discuss and build modes",
+		handler: async (_args, ctx) => toggleDiscussMode(ctx),
 	});
 
 	pi.registerCommand("todos", {
@@ -156,55 +203,63 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.registerShortcut(Key.tab, {
-		description: "Toggle plan/build mode",
-		handler: async (ctx) => togglePlanMode(ctx),
+		description: "Cycle build/plan/discuss mode",
+		handler: async (ctx) => cycleAssistantMode(ctx),
 	});
 
 	pi.registerShortcut(Key.ctrlAlt("p"), {
-		description: "Toggle plan/build mode",
-		handler: async (ctx) => togglePlanMode(ctx),
+		description: "Cycle build/plan/discuss mode",
+		handler: async (ctx) => cycleAssistantMode(ctx),
 	});
 
-	// Block destructive bash commands in plan mode
+	// Block destructive bash commands in read-only modes
 	pi.on("tool_call", async (event) => {
-		if (!planModeEnabled || event.toolName !== "bash") return;
+		if (!isReadOnlyMode() || event.toolName !== "bash") return;
 
 		const command = event.input.command as string;
 		if (!isSafeCommand(command)) {
+			const modeName = mode === "discuss" ? "Discuss" : "Plan";
+			const toggleCommand = mode === "discuss" ? "/discuss" : "/plan";
 			return {
 				block: true,
-				reason: `Plan mode: command blocked (not allowlisted). Use /plan to disable plan mode first.\nCommand: ${command}`,
+				reason: `${modeName} mode: command blocked (not allowlisted). Use ${toggleCommand} to disable ${mode} mode first.\nCommand: ${command}`,
 			};
 		}
 	});
 
-	// Filter out stale plan mode context when not in plan mode
+	// Filter out stale mode context when the matching mode is inactive
 	pi.on("context", async (event) => {
-		if (planModeEnabled) return;
+		function includesInactiveMarker(text: string): boolean {
+			return (
+				(mode !== "plan" && text.includes("[PLAN MODE ACTIVE]")) ||
+				(mode !== "discuss" && text.includes("[DISCUSS MODE ACTIVE]")) ||
+				(!executionMode && text.includes("[EXECUTING PLAN"))
+			);
+		}
 
 		return {
 			messages: event.messages.filter((m) => {
 				const msg = m as AgentMessage & { customType?: string };
-				if (msg.customType === "plan-mode-context") return false;
+				if (msg.customType === "plan-mode-context" && mode !== "plan") return false;
+				if (msg.customType === "discuss-mode-context" && mode !== "discuss") return false;
+				if (msg.customType === "plan-execution-context" && !executionMode) return false;
 				if (msg.role !== "user") return true;
 
 				const content = msg.content;
 				if (typeof content === "string") {
-					return !content.includes("[PLAN MODE ACTIVE]");
+					return !includesInactiveMarker(content);
 				}
 				if (Array.isArray(content)) {
-					return !content.some(
-						(c) => c.type === "text" && (c as TextContent).text?.includes("[PLAN MODE ACTIVE]"),
-					);
+					return !content.some((c) => c.type === "text" && includesInactiveMarker((c as TextContent).text ?? ""));
 				}
 				return true;
 			}),
 		};
 	});
 
-	// Inject plan/execution context before agent starts
+	// Inject plan/discuss/execution context before agent starts
 	pi.on("before_agent_start", async () => {
-		if (planModeEnabled) {
+		if (mode === "plan") {
 			return {
 				message: {
 					customType: "plan-mode-context",
@@ -227,6 +282,32 @@ Plan:
 ...
 
 Do NOT attempt to make changes - just describe what you would do.`,
+					display: false,
+				},
+			};
+		}
+
+		if (mode === "discuss") {
+			return {
+				message: {
+					customType: "discuss-mode-context",
+					content: `[DISCUSS MODE ACTIVE]
+You are in discuss mode - a read-only context-building mode for safe code analysis.
+
+Goal:
+- Establish shared context that can be used later in this chat
+- Surface relevant facts, constraints, decisions, risks, and open questions
+- Ask clarifying questions when they would improve the shared context
+
+Restrictions:
+- Built-in edit and write tools are disabled
+- Other currently active tools remain available
+- Bash is restricted to an allowlist of read-only commands
+
+Use available read/search/bash tools to inspect and understand the project when helpful.
+Ask clarifying questions using the questionnaire tool when useful.
+Do not produce a formal implementation plan unless the user explicitly asks for one.
+Do NOT attempt to make changes - just discuss, explain, and capture context.`,
 					display: false,
 				},
 			};
@@ -281,7 +362,7 @@ After completing a step, include a [DONE:n] tag in your response.`,
 			return;
 		}
 
-		if (!planModeEnabled || !ctx.hasUI) return;
+		if (mode !== "plan" || !ctx.hasUI) return;
 
 		// Extract todos from last assistant message
 		const lastAssistant = [...event.messages].reverse().find(isAssistantMessage);
@@ -313,7 +394,7 @@ After completing a step, include a [DONE:n] tag in your response.`,
 			const firstTodoItem = todoItems[0];
 			if (!firstTodoItem) return;
 
-			planModeEnabled = false;
+			mode = "build";
 			executionMode = true;
 			restoreNormalModeTools();
 			updateStatus(ctx);
@@ -344,7 +425,10 @@ After completing a step, include a [DONE:n] tag in your response.`;
 	// Restore state on session start/resume
 	pi.on("session_start", async (_event, ctx) => {
 		if (pi.getFlag("plan") === true) {
-			planModeEnabled = true;
+			mode = "plan";
+		}
+		if (pi.getFlag("discuss") === true) {
+			mode = "discuss";
 		}
 
 		const entries = ctx.sessionManager.getEntries();
@@ -355,10 +439,15 @@ After completing a step, include a [DONE:n] tag in your response.`;
 			.pop() as { data?: PlanModeState } | undefined;
 
 		if (planModeEntry?.data) {
-			planModeEnabled = planModeEntry.data.enabled ?? planModeEnabled;
+			const restoredMode = normalizeMode(planModeEntry.data.mode) ?? (planModeEntry.data.enabled ? "plan" : "build");
+			mode = restoredMode;
 			todoItems = planModeEntry.data.todos ?? todoItems;
 			executionMode = planModeEntry.data.executing ?? executionMode;
 			toolsBeforePlanMode = planModeEntry.data.toolsBeforePlanMode ?? toolsBeforePlanMode;
+		}
+
+		if (executionMode) {
+			mode = "build";
 		}
 
 		// On resume: re-scan messages to rebuild completion state
@@ -387,8 +476,10 @@ After completing a step, include a [DONE:n] tag in your response.`;
 			markCompletedSteps(allText, todoItems);
 		}
 
-		if (planModeEnabled) {
-			enablePlanModeTools();
+		if (isReadOnlyMode()) {
+			enableReadOnlyModeTools();
+		} else if (toolsBeforePlanMode !== undefined) {
+			restoreNormalModeTools();
 		}
 		updateStatus(ctx);
 	});
