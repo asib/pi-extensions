@@ -37,6 +37,10 @@ function sanitizeStatusText(text: string): string {
 	return text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
 }
 
+function stripAnsi(text: string): string {
+	return text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+}
+
 function latestThinkingLevel(entries: ReturnType<ExtensionContext["sessionManager"]["getEntries"]>): string | undefined {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i];
@@ -48,9 +52,13 @@ function latestThinkingLevel(entries: ReturnType<ExtensionContext["sessionManage
 }
 
 function modeBadge(status: string | undefined, theme: ExtensionContext["ui"]["theme"]): string {
-	const clean = sanitizeStatusText(status ?? "").toLowerCase();
-	if (clean.includes("/")) return theme.fg("accent", `📋 ${clean.replace(/^[^0-9]*/, "")}`);
-	if (clean.includes("plan")) return theme.fg("warning", "📝 PLAN");
+	const clean = stripAnsi(sanitizeStatusText(status ?? ""));
+	const lower = clean.toLowerCase();
+	if (lower.includes("/")) {
+		const progress = clean.match(/\d+\s*\/\s*\d+/)?.[0] ?? "";
+		return theme.fg("accent", `📋 ${progress}`);
+	}
+	if (lower.includes("plan")) return theme.fg("warning", "📝 PLAN");
 	return theme.fg("accent", "🛠️ BUILD");
 }
 
