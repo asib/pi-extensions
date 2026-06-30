@@ -7,7 +7,7 @@ Read-only exploration modes for safe code analysis and context building.
 - **Plan mode**: read-only planning with numbered plan extraction and execution tracking
 - **Discuss mode**: read-only context-building without pressure to produce a formal plan
 - **Built-in write tools disabled**: Disables edit/write while preserving other active tools in plan/discuss modes
-- **Bash allowlist**: Only read-only bash commands are allowed in plan/discuss modes
+- **Bash allowlist**: Only approved bash commands are allowed in plan/discuss modes
 - **Plan extraction**: Extracts numbered steps from `Plan:` sections while in plan mode
 - **Progress tracking**: Widget shows completion status during execution
 - **[DONE:n] markers**: Explicit step completion tracking
@@ -80,11 +80,11 @@ Plan:
 
 ### Command Allowlist
 
-Safe commands (allowed):
+Allowed commands include:
 - File inspection: `cat`, `head`, `tail`, `less`, `more`
 - Search: `grep`, `find`, `rg`, `fd`
 - Directory: `ls`, `pwd`, `tree`
-- Git read: `git status`, `git log`, `git diff`, `git branch`
+- Git: `git status`, `git log`, `git diff`, `git pull`, `git checkout`, `git branch` (also via `git -C <repo> ...` or `cd <repo> && git ...`)
 - Package info: `npm list`, `npm outdated`, `yarn info`
 - System info: `uname`, `whoami`, `date`, `uptime`
 

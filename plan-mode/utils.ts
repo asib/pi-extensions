@@ -27,7 +27,7 @@ const DESTRUCTIVE_PATTERNS = [
 	/\bpip\s+(install|uninstall)/i,
 	/\bapt(-get)?\s+(install|remove|purge|update|upgrade)/i,
 	/\bbrew\s+(install|uninstall|upgrade)/i,
-	/\bgit\s+(add|commit|push|pull|merge|rebase|reset|checkout|branch\s+-[dD]|stash|cherry-pick|revert|tag|init|clone)/i,
+	/\bgit\s+(add|commit|push|merge|rebase|reset|branch\s+-[dD]|stash|cherry-pick|revert|tag|init|clone)/i,
 	/\bsudo\b/i,
 	/\bsu\b/i,
 	/\bkill\b/i,
@@ -40,7 +40,7 @@ const DESTRUCTIVE_PATTERNS = [
 	/\b(vim?|nano|emacs|code|subl)\b/i,
 ];
 
-// Safe read-only commands allowed in plan mode
+// Commands allowed in plan/discuss mode
 const SAFE_PATTERNS = [
 	/^\s*cat\b/,
 	/^\s*head\b/,
@@ -77,7 +77,7 @@ const SAFE_PATTERNS = [
 	/^\s*top\b/,
 	/^\s*htop\b/,
 	/^\s*free\b/,
-	/^\s*git\s+(status|log|diff|show|branch|remote|config\s+--get)/i,
+	/^\s*(?:cd\s+(?:"[^"]+"|'[^']+'|\S+)\s*&&\s*)?git\s+(?:-C\s+(?:"[^"]+"|'[^']+'|\S+)\s+)?(status|log|diff|pull|checkout|show|branch|remote|config\s+--get)(?:\s|$)/i,
 	/^\s*git\s+ls-/i,
 	/^\s*npm\s+(list|ls|view|info|search|outdated|audit)/i,
 	/^\s*yarn\s+(list|info|why|audit)/i,

@@ -269,7 +269,7 @@ You are in plan mode - a read-only exploration mode for safe code analysis.
 Restrictions:
 - Built-in edit and write tools are disabled
 - Other currently active tools remain available
-- Bash is restricted to an allowlist of read-only commands
+- Bash is restricted to an allowlist of approved commands
 
 Ask clarifying questions using the questionnaire tool.
 Use brave-search skill via bash for web research.
@@ -302,7 +302,7 @@ Goal:
 Restrictions:
 - Built-in edit and write tools are disabled
 - Other currently active tools remain available
-- Bash is restricted to an allowlist of read-only commands
+- Bash is restricted to an allowlist of approved commands
 
 Use available read/search/bash tools to inspect and understand the project when helpful.
 Ask clarifying questions using the questionnaire tool when useful.
