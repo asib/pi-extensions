@@ -85,6 +85,7 @@ Allowed commands include:
 - Search: `grep`, `find`, `rg`, `fd`
 - Directory: `ls`, `pwd`, `tree`
 - Git: `git status`, `git log`, `git diff`, `git pull`, `git checkout`, `git branch` (also via `git -C <repo> ...` or `cd <repo> && git ...`)
+- GitHub CLI: `gh pr view`, `gh pr checks`
 - Package info: `npm list`, `npm outdated`, `yarn info`
 - System info: `uname`, `whoami`, `date`, `uptime`
 

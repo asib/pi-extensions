@@ -79,6 +79,7 @@ const SAFE_PATTERNS = [
 	/^\s*free\b/,
 	/^\s*(?:cd\s+(?:"[^"]+"|'[^']+'|\S+)\s*&&\s*)?git\s+(?:-C\s+(?:"[^"]+"|'[^']+'|\S+)\s+)?(status|log|diff|pull|checkout|show|branch|remote|config\s+--get)(?:\s|$)/i,
 	/^\s*git\s+ls-/i,
+	/^\s*gh\s+pr\s+(view|checks)(?:\s|$)/i,
 	/^\s*npm\s+(list|ls|view|info|search|outdated|audit)/i,
 	/^\s*yarn\s+(list|info|why|audit)/i,
 	/^\s*node\s+--version/i,
